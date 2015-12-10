@@ -42,6 +42,9 @@ struct LifetimeUnsafe {
         *destination = value;
         return value;
     }
+    inline static id load(id* source) {
+        return *source;
+    }
 };
 
 // Retain - a retaining/releasing store of a refcountable object.
@@ -52,6 +55,9 @@ struct LifetimeRetain {
         // objc_storeStrong(&x, nil) will release the value at x.
         // This is in line with the implementation of ARC.
         return objc_storeStrong(destination, value);
+    }
+    inline static id load(id* source) {
+        return *source;
     }
 };
 
@@ -67,6 +73,10 @@ private:
     using TCanConvertTo = std::is_convertible<TObjPointer, TOther>;
 
     id _val = reinterpret_cast<id>(0);
+
+    id _get() {
+        return TLifetimeTraits::load(&_val);
+    }
 
 public:
     AutoId() : _val(nil) {
@@ -95,11 +105,11 @@ public:
     template <typename TOtherObj, typename TOtherLifetime, typename = typename std::enable_if<TCanConvertFrom<TOtherObj>::value>::type>
     AutoId(const AutoId<TOtherObj, TOtherLifetime>& other)
         : _val(nil) {
-        TLifetimeTraits::store(&_val, other._val);
+        TLifetimeTraits::store(&_val, other._get());
     }
 
     AutoId(const AutoId<TObj, TLifetimeTraits>& other) : _val(nil) {
-        TLifetimeTraits::store(&_val, other._val);
+        TLifetimeTraits::store(&_val, other._get());
     }
 
     // We can only move from the same lifetime, and only with convertible objects.
@@ -110,7 +120,7 @@ public:
     }
 
     AutoId(AutoId<TObj, TLifetimeTraits>&& other) {
-        _val = other._val;
+        _val = other._get();
         other._val = nil;
     }
 
@@ -131,16 +141,16 @@ public:
 
     template <typename Any, typename = typename std::enable_if<TCanConvertTo<Any>::value && !std::is_same<Any, id>::value>::type>
     explicit operator Any() const {
-        return reinterpret_cast<Any>(_val);
+        return reinterpret_cast<Any>(_get());
     }
 
     // The object conversion operator is primarily used when an AutoId<> is the destination of a message.
     operator TObjPointer() const {
-        return _val;
+        return _get();
     }
 
     explicit operator bool() const {
-        return _val != nil;
+        return _get() != nil;
     }
 
     // The attach function assumes ownership of an already-refcounted object.
@@ -173,12 +183,12 @@ public:
     // to a retaining AutoId's value.
     template <typename TOtherObj, typename TOtherLifetime, typename = typename std::enable_if<TCanConvertFrom<TOtherObj>::value>::type>
     AutoId<TObj, TLifetimeTraits>& operator=(const AutoId<TOtherObj, TOtherLifetime>& other) {
-        TLifetimeTraits::store(&_val, other._val);
+        TLifetimeTraits::store(&_val, other._get());
         return *this;
     }
 
     AutoId<TObj, TLifetimeTraits>& operator=(const AutoId<TObj, TLifetimeTraits>& other) {
-        TLifetimeTraits::store(&_val, other._val);
+        TLifetimeTraits::store(&_val, other._get());
         return *this;
     }
 
@@ -193,7 +203,7 @@ public:
     }
 
     AutoId<TObj, TLifetimeTraits>& operator=(AutoId<TObj, TLifetimeTraits>&& other) {
-        _val = other._val;
+        _val = other._get();
         other._val = nil;
         return *this;
     }
@@ -213,17 +223,17 @@ public:
     bool operator!=(const Any& other) const {
         // Use a C-style cast here because we want static_cast behaviour for convertible types and
         // reinterpret_cast behaviour for pointer/value types that can't be converted.
-        return (id)other != _val;
+        return (id)other != _get();
     }
 
     template <typename Any>
     bool operator==(const Any& other) const {
         // As above.
-        return (id)other == _val;
+        return (id)other == _get();
     }
 
     TObjPointer operator->() {
-        return _val;
+        return _get();
     }
 
     TObjPointer get() {
@@ -234,7 +244,10 @@ public:
     // This conditionally-enabled operator() provides block calling semantics to AutoIds wrapping blocks.
     template <typename... Args>
     auto operator()(Args... args) -> decltype(std::declval<TObjPointer>()(args...)) {
-        return static_cast<TObjPointer>(_val)(std::forward<Args>(args)...);
+        auto val = static_cast<TObjPointer>(_get());
+        if (val) {
+            return val(std::forward<Args>(args)...);
+        }
     }
 
     template <typename TOtherObj, typename TOtherLifetime>

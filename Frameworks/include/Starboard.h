@@ -274,6 +274,28 @@ inline CAPoint3D operator*(float f, const CAPoint3D& v) {
 
 #include "Starboard/SmartTypes.h"
 
+#ifdef __cplusplus
+template<typename TClass>
+TClass* dynamic_class_cast(id other) noexcept {
+    if ([other isKindOfClass:[TClass class]]) {
+        return reinterpret_cast<TClass*>(other);
+    } else {
+        return nil;
+    }
+}
+
+/* fascinatingly broken
+template<decltype(@protocol(NSObject)) TProtocol>
+id dynamic_protocol_cast(id other) noexcept {
+    if ([[other class] conformsToProtocol:TProtocol]) {
+        return reinterpret_cast<id>(other);
+    } else {
+        return nil;
+    }
+}
+*/
+
+
 #ifdef __OBJC__
 @protocol NSFastEnumeration;
 #include <iterator>

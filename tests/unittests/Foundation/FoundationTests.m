@@ -1286,3 +1286,37 @@ TEST(Foundation, NSSet_PerformSelector) {
     [set makeObjectsPerformSelector:@selector(removeAllObjects)];
     EXPECT_EQ(0, [array count]);
 }
+
+#if 0
+TEST(Foundation, objc_enumeration) {
+    NSArray *a = @[@1, @2, @3, @4, @5];
+    NSMutableArray *ma = [NSMutableArray array];
+    for(int i = 0; i < 90; ++i) {
+        [ma addObject:@(i)];
+    }
+    for(id val in a) {
+        NSLog(@"OB %@", val);
+    }
+    for(id val in ma) {
+        NSLog(@"OB %@", val);
+    }
+    auto oea = objc_enumeration{[ma reverseObjectEnumerator]};
+    for(auto& val: oea) {
+        NSLog(@"OCC %@", val);
+    }
+
+    NSMutableArray *b = [[NSMutableArray alloc] init];
+    [b addObject:@10];
+    [b addObject:@20];
+    for(auto& val: objc_enumeration{b}) {
+        NSLog(@"MCC %@", [val description]);
+    }
+    NSLog(@"T %@", (id)(objc_enumeration{b}.begin()));
+
+    std::vector<int> cpv;
+    std::transform(oea.begin(), oea.end(), std::back_inserter(cpv), [](const id& val) -> int {
+        return [val integerValue];
+    });
+    1;
+}
+#endif

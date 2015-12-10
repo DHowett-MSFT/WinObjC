@@ -273,3 +273,67 @@ inline CAPoint3D operator*(float f, const CAPoint3D& v) {
 }
 
 #include "Starboard/SmartTypes.h"
+
+#ifdef __OBJC__
+@protocol NSFastEnumeration;
+#include <iterator>
+class objc_enumeration {
+    id<NSFastEnumeration> _enumeration;
+public:
+    class iterator: public std::iterator<std::forward_iterator_tag, id, ptrdiff_t, id*, id&> {
+        id<NSFastEnumeration> _enumeration;
+        NSFastEnumerationState _state;
+        id* _objects;
+        id _tempObjects[16];
+        size_t _count;
+    public:
+        iterator(id<NSFastEnumeration> enumeration): _enumeration(enumeration), _state{}, _objects(&_tempObjects[0]), _count(0) { ::memset(reinterpret_cast<void*>(&_state), 0, sizeof(_state)); ++*this; }
+        iterator(): _enumeration(nil), _objects(nullptr), _count(0) { }
+        const id& operator*() const {
+            return *_objects;
+        }
+        const id& operator->() const {
+            return *_objects;
+        }
+        operator id() const {
+            return *_objects;
+        }
+        iterator operator++(int) {
+            iterator temp = *this;
+            ++*this;
+            return temp;
+        }
+        iterator& operator++() {
+            if (!_objects) {
+                return *this;
+            }
+
+            if (_count == 0) {
+                auto count = [_enumeration countByEnumeratingWithState:&_state objects:&_tempObjects[0] count:std::extent<decltype(_tempObjects)>::value];
+                if (count == 0) {
+                    _objects = nullptr;
+                    return *this;
+                }
+
+                _objects = _state.itemsPtr;
+                // -1 because *_objects already points at the first object.
+                // _count is actually the number of advancements we can make.
+                _count = count - 1;
+            } else {
+                _objects++;
+                _count--;
+            }
+            return *this;
+        }
+        bool operator==(const iterator& other) const {
+            return (!_objects && !other._objects) || (_objects && other._objects && *_objects == *other._objects && _enumeration == other._enumeration);
+        }
+        bool operator!=(const iterator& other) const {
+            return !operator==(other);
+        }
+    };
+    objc_enumeration(id<NSFastEnumeration> enumeration): _enumeration(enumeration) { }
+    iterator begin() const { return {_enumeration}; }
+    iterator end() const { return {}; }
+};
+#endif

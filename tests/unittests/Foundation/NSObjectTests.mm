@@ -17,6 +17,8 @@
 #include <TestFramework.h>
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
+#import <Starboard/SmartTypes.h>
+#import <IwMalloc.h>
 
 #define TEST_PREFIX Foundation_NSObject_Tests
 #define _CONCAT(x, y) x ## y
@@ -207,4 +209,142 @@ TEST(NSObject, DynamicResolution) {
     EXPECT_STREQ("i", [signature getArgumentTypeAtIndex:2]);
 
     EXPECT_OBJCEQ(nil, [instance methodSignatureForSelector:@selector(dynamicClassMethodForSignature:)]);
+}
+
+enum annotation_type: unsigned int {
+    Unknown = 0,
+    Cluster,
+    Prototype,
+};
+
+struct annotation {
+    id protocol;
+    Class baseClass;
+    annotation* next;
+};
+
+static std::map<std::tuple<std::string, annotation_type>, annotation> gatherAnnotationProtocols() {
+    std::map<std::tuple<std::string, annotation_type>, annotation> annotations;
+    unsigned int count = 0;
+    woc::unique_iw<Protocol*> objcProtocolList(objc_copyProtocolList(&count));
+    for(int i = 0; i < count; ++i) {
+        Protocol* p = *(objcProtocolList.get() + i);
+        annotation_type type = Unknown;
+        if(strstr(protocol_getName(p), "_Annotation_Cluster") != nullptr) {
+            type = Cluster;
+        } else if(strstr(protocol_getName(p), "_Annotation_Prototype") != nullptr) {
+            type = Prototype;
+        }
+
+        if (type == Unknown) {
+            continue;
+        }
+
+        char* name = IwStrDup(protocol_getName(p));
+        name[strlen(name) - (type == Cluster ? 19 : 21)] = '\0';
+        std::string className(name);
+        Class cls = objc_getClass(name);
+        IwFree(name);
+        annotation& a = annotations[std::forward_as_tuple(className, type)];
+        a.protocol = p;
+        a.baseClass = cls;
+        a.next = nullptr;
+    }
+
+    for (auto& pair: annotations) {
+        auto& a = pair.second;
+        Class cls = a.baseClass;
+        for(cls = class_getSuperclass(cls); cls; cls = class_getSuperclass(cls)) {
+            std::string thisClassName(class_getName(cls));
+            auto f = annotations.find(std::forward_as_tuple(thisClassName, std::get<1>(pair.first)));
+            if (f != annotations.end()) {
+                a.next = &f->second;
+                break;
+            }
+        }
+    }
+    return annotations;
+}
+
+@protocol NSCalendar_Annotation_Prototype
+@required
+- (id)initWithCalendarIdentifier:(int)identifier;
+@end
+
+@protocol NSCalendar_Annotation_Cluster
+@required
+- (BOOL)date:(NSDate*)date matchesComponents:(NSDateComponents*)comps;
+- (NSUInteger)notTheRealLengthButClose;
+@optional
+- (void)calculateExpensiveThings;
+@end
+
+TEST(AAA, AAAA) {
+    auto annotations = gatherAnnotationProtocols();
+    std::set<Class> annotatedClasses;
+    for(auto pair: annotations) {
+        annotatedClasses.emplace(pair.second.baseClass);
+    }
+
+    unsigned int count;
+    woc::unique_iw<Class[]> objcClassList(objc_copyClassList(&count));
+    for(int i = 0; i < count; ++i) {
+        Class baseClass, cls = baseClass = objcClassList[i];
+        if (annotatedClasses.find(cls) != annotatedClasses.end()) {
+            // Do not signal on annotated classes themselves.
+            continue;
+        }
+        std::string baseClassName(class_getName(baseClass));
+        annotation_type classType = Cluster;
+        const char* typeString = "Concrete";
+        if (baseClassName.find("Prototype") != std::string::npos) {
+            classType = Prototype;
+            typeString = "Prototype";
+        }
+
+        for(; cls; cls = class_getSuperclass(cls)) {
+            std::string thisClassName(class_getName(cls));
+
+            auto f = annotations.find(std::forward_as_tuple(thisClassName, classType));
+            if (f == annotations.end()) {
+                continue;
+            }
+
+            for(annotation* a = &f->second; a; a = a->next) {
+                if (baseClass == a->baseClass) {
+                    continue;
+                }
+
+                unsigned int reqCount = 0, optCount = 0;
+                woc::unique_iw<objc_method_description[]> reqMethodDescs(protocol_copyMethodDescriptionList(a->protocol, YES, YES, &reqCount));
+                woc::unique_iw<objc_method_description[]> optMethodDescs(protocol_copyMethodDescriptionList(a->protocol, NO, YES, &optCount));
+                for(unsigned int method_i = 0; method_i < reqCount; ++method_i) {
+                    objc_method_description& desc = reqMethodDescs[method_i];
+                    Method rootMethod = class_getInstanceMethod(a->baseClass, desc.name);
+                    Method m = class_getInstanceMethod(baseClass, desc.name);
+                    if (rootMethod && m == rootMethod) {
+                        // Ignore implementations inherited straight from the base class.
+                        m = nullptr;
+                    }
+                    EXPECT_NE_MSG(nullptr, m, @"%s subclass %s of class cluster %@ does not implement required method %s.", typeString, class_getName(baseClass), a->baseClass, sel_getName(desc.name));
+                    if (m) {
+                        EXPECT_STREQ_MSG(desc.types, method_getTypeEncoding(m), @"%s subclass %s of class cluster %@ implemented required method %s with incorrect type.", typeString, class_getName(baseClass), a->baseClass, sel_getName(desc.name));
+                    }
+                }
+                for(unsigned int method_i = 0; method_i < optCount; ++method_i) {
+                    objc_method_description& desc = optMethodDescs[method_i];
+                    Method rootMethod = class_getInstanceMethod(a->baseClass, desc.name);
+                    Method m = class_getInstanceMethod(baseClass, desc.name);
+                    if (rootMethod && m == rootMethod) {
+                        // Ignore implementations inherited straight from the base class.
+                        m = nullptr;
+                    }
+                    if (!m) {
+                        LOG_INFO(@"%s subclass %s of class cluster %@ could implement optional method %s for performance improvements.", typeString, class_getName(baseClass), a->baseClass, sel_getName(desc.name));
+                    }
+                }
+            }
+        }
+    }
+
 }

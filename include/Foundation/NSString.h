@@ -92,6 +92,29 @@ typedef NS_ENUM(NSUInteger, NSStringEncoding) {
     NSProprietaryStringEncoding = 65536
 };
 
+// Methods required in concrete NSString subclasses.
+@protocol NSString_Annotation_Cluster
+@required
+- (NSUInteger)length;
+- (unichar)characterAtIndex:(NSUInteger)index;
+@optional
+- (void)getCharacters:(unichar)buffer range:(NSRange)range;
+@end
+
+@protocol NSMutableString_Annotation_Cluster
+@required
+- (void)replaceCharactersInRange:(NSRange)aRange withString:(NSString*)aString;
+@end
+
+// Methods required in NSString prototypes.
+@protocol NSString_Annotation_Prototype
+@required
+@end
+
+@protocol NSMutableString_Annotation_Prototype
+@required
+@end
+
 FOUNDATION_EXPORT_CLASS
 @interface NSString : NSObject <NSCopying, NSMutableCopying, NSSecureCoding> {
 }

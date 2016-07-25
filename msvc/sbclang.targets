@@ -357,7 +357,7 @@
   </ItemDefinitionGroup>
 
   <PropertyGroup>
-    <ComputeLinkInputsTargets>$(ComputeLinkInputsTargets);ComputeClangLinkInputs;ComputeRuntimeInputs;ComputeObjectiveCLinkInputs</ComputeLinkInputsTargets>
+    <ComputeLinkInputsTargets>$(ComputeLinkInputsTargets);ComputeClangLinkInputs;ComputeRuntimeInputs;ComputeWholeArchiveLinkInputs;ConsumeObjectiveCLinkInputs</ComputeLinkInputsTargets>
     <ComputeLibInputsTargets>$(ComputeLibInputsTargets);ComputeClangLibInputs;</ComputeLibInputsTargets>
     <ComputeImpLibInputsTargets>$(ComputeImpLibInputsTargets);ComputeClangImpLibInputs;</ComputeImpLibInputsTargets>
   </PropertyGroup>
@@ -482,6 +482,18 @@
     <ItemGroup Condition="'@(_StarboardReferencesRequiringObjectiveC)'!=''">
       <Link>
         <AdditionalOptions>%(Link.AdditionalOptions) /INCLUDE:$(StarboardObjectiveCPinningSymbolName)</AdditionalOptions>
+      </Link>
+    </ItemGroup>
+  </Target>
+
+  <!-- This target adds one /WHOLEARCHIVE: for every referenced project that includes Objective-C code.
+       This pulls in a lot of things, but it clears up many of the issues surrounding Objective-C categories
+       and 2-stage loading.
+  -->
+  <Target Name="ComputeWholeArchiveLinkInputs" DependsOnTargets="ComputeStarboardReferencesRequiringObjectiveC">
+    <ItemGroup Condition="'@(_StarboardReferencesRequiringObjectiveC)'!=''">
+      <Link>
+        <AdditionalOptions>%(Link.AdditionalOptions) "/WHOLEARCHIVE:@(_StarboardReferencesRequiringObjectiveC, '" /WHOLEARCHIVE:"')"</AdditionalOptions>
       </Link>
     </ItemGroup>
   </Target>

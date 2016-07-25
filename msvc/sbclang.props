@@ -50,6 +50,7 @@
     <StarboardObjectiveCPinningSymbolName Condition="'$(Platform)' != 'ARM'">____pin_objc_init</StarboardObjectiveCPinningSymbolName>
     <StarboardObjectiveCPinningSymbolName Condition="'$(Platform)' == 'ARM'">___pin_objc_init</StarboardObjectiveCPinningSymbolName>
     <IslandwoodDRT Condition="'$(IslandwoodDRT)' == ''">true</IslandwoodDRT>
+    <StarboardLinkWholeArchive Condition="'$(StarboardLinkWholeArchive)' == ''">false</StarboardLinkWholeArchive>
     <CopyStarboardLibraries Condition="'$(ConfigurationType)' == 'Application'">true</CopyStarboardLibraries>
   </PropertyGroup>
 

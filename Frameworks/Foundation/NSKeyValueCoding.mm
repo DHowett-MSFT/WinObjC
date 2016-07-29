@@ -41,17 +41,17 @@
 NSString* const NSUndefinedKeyException = @"NSUndefinedKeyException";
 NSString* const NSTargetObjectUserInfoKey = @"NSTargetObjectUserInfoKey";
 NSString* const NSUnknownUserInfoKey = @"NSUnknownUserInfoKey";
-NSString* const NSAverageKeyValueOperator = @"NSAverageKeyValueOperator";
-NSString* const NSCountKeyValueOperator = @"NSCountKeyValueOperator";
-NSString* const NSDistinctUnionOfArraysKeyValueOperator = @"NSDistinctUnionOfArraysKeyValueOperator";
-NSString* const NSDistinctUnionOfObjectsKeyValueOperator = @"NSDistinctUnionOfObjectsKeyValueOperator";
-NSString* const NSDistinctUnionOfSetsKeyValueOperator = @"NSDistinctUnionOfSetsKeyValueOperator";
-NSString* const NSMaximumKeyValueOperator = @"NSMaximumKeyValueOperator";
-NSString* const NSMinimumKeyValueOperator = @"NSMinimumKeyValueOperator";
-NSString* const NSSumKeyValueOperator = @"NSSumKeyValueOperator";
-NSString* const NSUnionOfArraysKeyValueOperator = @"NSUnionOfArraysKeyValueOperator";
-NSString* const NSUnionOfObjectsKeyValueOperator = @"NSUnionOfObjectsKeyValueOperator";
-NSString* const NSUnionOfSetsKeyValueOperator = @"NSUnionOfSetsKeyValueOperator";
+NSString* const NSAverageKeyValueOperator = @"avg";
+NSString* const NSCountKeyValueOperator = @"count";
+NSString* const NSDistinctUnionOfArraysKeyValueOperator = @"distinctUnionOfArrays";
+NSString* const NSDistinctUnionOfObjectsKeyValueOperator = @"distinctUnionOfObjects";
+NSString* const NSDistinctUnionOfSetsKeyValueOperator = @"distinctUnionOfSets";
+NSString* const NSMaximumKeyValueOperator = @"max";
+NSString* const NSMinimumKeyValueOperator = @"min";
+NSString* const NSSumKeyValueOperator = @"sum";
+NSString* const NSUnionOfArraysKeyValueOperator = @"unionOfArrays";
+NSString* const NSUnionOfObjectsKeyValueOperator = @"unionOfObjects";
+NSString* const NSUnionOfSetsKeyValueOperator = @"unionOfSets";
 
 NSString* _NSKVCSplitKeypath(NSString* keyPath, NSString* __autoreleasing* pRemainder) {
     NSData* utf8String = [keyPath dataUsingEncoding:NSUTF8StringEncoding];

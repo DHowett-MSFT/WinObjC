@@ -147,3 +147,23 @@ DRAW_TEST_F(CGContext, ChangeCTMAfterCreatingPath, WhiteBackgroundTest) {
     CGContextStrokePath(context);
     CGContextRestoreGState(context);
 }
+
+DRAW_TEST_F(CGContext, WhatOnEarthIsHappening, UIKitMimicTest) {
+    CGContextRef context = GetDrawingContext();
+    CGRect bounds = GetDrawingBounds();
+
+    bounds = CGRectInset(bounds, 16.f, 16.f);
+
+    CGContextSetRGBFillColor(context, 0.0, 0.0, 0.0, 1.0);
+    CGContextSetRGBStrokeColor(context, 1.0, 0.0, 0.0, 0.5);
+    CGContextSetLineWidth(context, 1.0);
+
+    CGContextScaleCTM(context, 1.0, 1.0);
+
+    CGContextAddRect(context, _CGRectCenteredOnPoint({bounds.size.height, bounds.size.height}, _CGRectGetCenter(bounds)));
+    CGContextFillPath(context);
+
+    CGContextAddRect(context, _CGRectCenteredOnPoint({bounds.size.height, bounds.size.height}, _CGRectGetCenter(bounds)));
+    CGContextScaleCTM(context, 10.0, 0.5);
+    CGContextStrokePath(context);
+}

@@ -1510,15 +1510,15 @@ static HRESULT __CGContextRenderToCommandList(CGContextRef context,
     deviceContext->SetTarget(commandList.Get());
 
     CGAffineTransform transform = CGAffineTransformIdentity;
-    switch (coordinateMode) {
-        case _kCGCoordinateModeUserSpace:
+    //switch (coordinateMode) {
+        //case _kCGCoordinateModeUserSpace:
             transform = CGContextGetUserSpaceToDeviceSpaceTransform(context);
-            break;
-        case _kCGCoordinateModeDeviceSpace:
-        default:
-            // do nothing; base transform is identity.
-            break;
-    }
+            //break;
+        //case _kCGCoordinateModeDeviceSpace:
+        //default:
+            //// do nothing; base transform is identity.
+            //break;
+    //}
 
     if (additionalTransform) {
         transform = CGAffineTransformConcat(*additionalTransform, transform);
@@ -1592,7 +1592,15 @@ static HRESULT __CGContextDrawGeometry(CGContextRef context,
     ComPtr<ID2D1CommandList> commandList;
     ComPtr<ID2D1Geometry> geometry(pGeometry);
     HRESULT hr = __CGContextRenderToCommandList(
-        context, coordinateMode, nullptr, &commandList, [geometry, drawMode](CGContextRef context, ID2D1DeviceContext* deviceContext) {
+        context, coordinateMode, nullptr, &commandList, [geometry, drawMode, coordinateMode](CGContextRef context, ID2D1DeviceContext* deviceContext) {
+        ComPtr<ID2D1Geometry> gtd{geometry};
+            if (coordinateMode == _kCGCoordinateModeDeviceSpace) {
+                auto inv = __CGAffineTransformToD2D_F(CGAffineTransformInvert(CGContextGetUserSpaceToDeviceSpaceTransform(context)));
+                ComPtr<ID2D1TransformedGeometry> tg;
+                context->Factory()->CreateTransformedGeometry(geometry, inv, &tg);
+                gtd = tg;
+            }
+
             auto& state = context->CurrentGState();
             if (drawMode & kCGPathFill) {
                 state.fillBrush->SetOpacity(state.alpha);
@@ -1600,7 +1608,7 @@ static HRESULT __CGContextDrawGeometry(CGContextRef context,
                 ComPtr<ID2D1Geometry> geometryToFill;
                 D2D1_FILL_MODE d2dFillMode =
                     (drawMode & kCGPathEOFill) == kCGPathEOFill ? D2D1_FILL_MODE_ALTERNATE : D2D1_FILL_MODE_WINDING;
-                RETURN_IF_FAILED(_CGConvertD2DGeometryToFillMode(geometry.Get(), d2dFillMode, &geometryToFill));
+                RETURN_IF_FAILED(_CGConvertD2DGeometryToFillMode(gtd.Get(), d2dFillMode, &geometryToFill));
 
                 deviceContext->FillGeometry(geometryToFill.Get(), state.fillBrush.Get());
             }
@@ -1611,7 +1619,7 @@ static HRESULT __CGContextDrawGeometry(CGContextRef context,
 
                 state.strokeBrush->SetOpacity(state.alpha);
 
-                deviceContext->DrawGeometry(geometry.Get(), state.strokeBrush.Get(), state.lineWidth, state.strokeStyle.Get());
+                deviceContext->DrawGeometry(gtd.Get(), state.strokeBrush.Get(), state.lineWidth, state.strokeStyle.Get());
             }
 
             return S_OK;

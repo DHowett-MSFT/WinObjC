@@ -221,3 +221,43 @@ DISABLED_DRAW_TEST_F(CGContext, ChangeCTMAfterCreatingPath, WhiteBackgroundTest)
     CGContextStrokePath(context);
     CGContextRestoreGState(context);
 }
+
+DRAW_TEST_F(CGContext, AntialiasToggleTranscendsGState, WhiteBackgroundTest) {
+    CGContextRef context = GetDrawingContext();
+    CGRect bounds = GetDrawingBounds();
+
+    CGContextSetLineWidth(context, 1.f);
+    CGContextSetRGBStrokeColor(context, 0.0, 0.0, 0.0, 1.0);
+
+    // Explicitly enable antialiasing, and draw a blurry line.
+    CGContextSetAllowsAntialiasing(context, TRUE);
+    CGContextSetShouldAntialias(context, TRUE);
+
+    CGPoint blurryLineSegments[]{
+        {5, 5}, {bounds.size.width - 10, bounds.size.height - 10},
+    };
+    CGContextStrokeLineSegments(context, blurryLineSegments, 2);
+
+    // Disable global antialiasing inside a GState and pop that GState;
+    // antialiasing should be disabled in the parent (!).
+    CGContextSaveGState(context);
+    CGContextSetAllowsAntialiasing(context, FALSE);
+    CGContextRestoreGState(context);
+
+    // Draw an erstwhile blurry line.
+    CGPoint crispLineSegments[]{
+        {bounds.size.width - 10, 5}, {5, bounds.size.height - 10},
+    };
+    CGContextStrokeLineSegments(context, crispLineSegments, 2);
+
+    // Re-enable global antialiasing inside a GState and pop that GState.
+    // antialiasing should be re-enabled!
+    CGContextSaveGState(context);
+    CGContextSetAllowsAntialiasing(context, TRUE);
+    CGContextRestoreGState(context);
+
+    CGPoint blurryLineSegments2[]{
+        {15, 5}, {bounds.size.width, bounds.size.height - 10},
+    };
+    CGContextStrokeLineSegments(context, blurryLineSegments2, 2);
+}

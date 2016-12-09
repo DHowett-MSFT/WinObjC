@@ -50,3 +50,34 @@ DISABLED_DRAW_TEST_F(CGContext, ShadowWithRotatedCTM, WhiteBackgroundTest) {
 
     CGContextStrokeRect(context, rect);
 }
+
+class CGContextShadows : public WhiteBackgroundTest, public ::testing::WithParamInterface<CGFloat> {
+    CFStringRef CreateOutputFilename() {
+        CGFloat shadow = GetParam();
+        return CFStringCreateWithFormat(nullptr, nullptr, CFSTR("TestImage.CGContext.Shadow%1.01f.png"), shadow);
+    }
+};
+
+TEST_P(CGContextShadows, StrokedRect) {
+    CGContextRef context = GetDrawingContext();
+    CGRect bounds = GetDrawingBounds();
+    CGFloat shadow = GetParam();
+
+    CGContextSetRGBStrokeColor(context, 1.0, 0.0, 0.0, 1.0);
+    CGContextSetLineWidth(context, 5);
+
+    CGContextSetShadow(context, CGSize{ 10.f, 10.f }, shadow);
+
+    CGPoint center = _CGRectGetCenter(bounds);
+    CGRect rect = _CGRectCenteredOnPoint({ 150, 150 }, center);
+
+    CGContextStrokeRect(context, rect);
+}
+
+INSTANTIATE_TEST_CASE_P(SmallStepShadows,
+                        CGContextShadows,
+                        ::testing::Range(static_cast<CGFloat>(0.0f), static_cast<CGFloat>(5.1f), static_cast<CGFloat>(0.2f)));
+
+INSTANTIATE_TEST_CASE_P(LargeStepShadows,
+                        CGContextShadows,
+                        ::testing::Range(static_cast<CGFloat>(5.5f), static_cast<CGFloat>(30.1f), static_cast<CGFloat>(0.5f)));

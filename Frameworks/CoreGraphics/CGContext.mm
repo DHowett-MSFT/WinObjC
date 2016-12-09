@@ -1728,7 +1728,7 @@ HRESULT __CGContext::_CreateShadowEffect(ID2D1Image* inputImage, ID2D1Effect** o
         RETURN_IF_FAILED(deviceContext->CreateEffect(CLSID_D2D1Shadow, &shadowEffect));
         shadowEffect->SetInput(0, inputImage);
         RETURN_IF_FAILED(shadowEffect->SetValue(D2D1_SHADOW_PROP_COLOR, state.shadowColor));
-        RETURN_IF_FAILED(shadowEffect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, state.shadowBlur));
+        RETURN_IF_FAILED(shadowEffect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, state.shadowBlur * 2.f / 3.f));
 
         // By default, the shadow projects straight down. Stacking it with an
         // Affine Transform effect allows us to change the shadow's projection.

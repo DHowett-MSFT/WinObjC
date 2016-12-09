@@ -18,6 +18,7 @@
 #import <ImageIO/CGImageDestination.h>
 #import "CGImageDestinationInternal.h"
 #import <StubReturn.h>
+#import <CGImageInternal.h>
 #include <windows.h>
 #include <string>
 
@@ -1015,22 +1016,27 @@ void CGImageDestinationAddImage(CGImageDestinationRef idst, CGImageRef image, CF
         return;
     }
 
-    CGDataProviderRef provider = CGImageGetDataProvider(image);
-    NSData* imageByteData = (id)CGDataProviderCopyData(provider);
+    //CGDataProviderRef provider = CGImageGetDataProvider(image);
+    //NSData* imageByteData = (id)CGDataProviderCopyData(provider);
 
     // Turn image into a WIC Bitmap
     ComPtr<IWICBitmap> inputImage;
+    status = _CGImageGetWICImageSource(image, &inputImage);
+    if (!SUCCEEDED(status)) {
+        NSTraceInfo(TAG, @"CreateBitmapFromMemory failed with status=%x\n", status);
+        return;
+    }
 
     // All our input coming in from CGImagesource is in 32bppRGBA
-    ComPtr<IWICImagingFactory> imageFactory = imageDestination.idFactory;
-    status = imageFactory->CreateBitmapFromMemory(imageWidth,
-                                                  imageHeight,
-                                                  GUID_WICPixelFormat32bppRGBA,
-                                                  imageWidth * 4,
-                                                  imageHeight * imageWidth * 4,
-                                                  (unsigned char*)[imageByteData bytes],
-                                                  &inputImage);
-    [imageByteData release];
+    //ComPtr<IWICImagingFactory> imageFactory = imageDestination.idFactory;
+    //status = imageFactory->CreateBitmapFromMemory(imageWidth,
+                                                  //imageHeight,
+                                                  //GUID_WICPixelFormat32bppRGBA,
+                                                  //imageWidth * 4,
+                                                  //imageHeight * imageWidth * 4,
+                                                  //(unsigned char*)[imageByteData bytes],
+                                                  //&inputImage);
+    //[imageByteData release];
     if (!SUCCEEDED(status)) {
         NSTraceInfo(TAG, @"CreateBitmapFromMemory failed with status=%x\n", status);
         return;

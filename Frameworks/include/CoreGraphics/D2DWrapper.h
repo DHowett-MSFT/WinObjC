@@ -17,6 +17,7 @@
 #pragma once
 
 #include <COMIncludes.h>
+#import <WRLHelpers.h>
 #import <wrl/client.h>
 #import <D2d1.h>
 #import "Wincodec.h"
@@ -58,3 +59,82 @@ inline D2D_RECT_F __CGRectToD2D_F(CGRect rect) {
         rect.origin.x, rect.origin.y, rect.origin.x + rect.size.width, rect.origin.y + rect.size.height,
     };
 }
+
+class AxisAlignedRectangleChecker : public ID2D1SimplifiedGeometrySink {
+public:
+    AxisAlignedRectangleChecker();
+
+    bool IsAxisAlignedRectangle() const {
+        return m_fConfirmedRectangle;
+    }
+
+    STDMETHOD_(void, SetFillMode)(D2D1_FILL_MODE fillMode) {
+        return;
+    }
+
+    STDMETHOD_(void, SetSegmentFlags)(D2D1_PATH_SEGMENT vertexFlags) {
+        return;
+    }
+
+    STDMETHOD_(void, EndFigure)(D2D1_FIGURE_END figureEnd) {
+        m_fFigureOpened = false;
+        m_uFigureNum++;
+    }
+
+    STDMETHOD_(void, BeginFigure)(D2D1_POINT_2F startPoint, D2D1_FIGURE_BEGIN figureBegin) {
+        m_fFigureOpened = true;
+
+        //
+        // If we're not considered a filled shape or we've already added a
+        // figure, then we're not a rectangle.
+        //
+        if (figureBegin != D2D1_FIGURE_BEGIN_FILLED || m_uFigureNum != 0) {
+            m_fDefinitelyNotRectangle = true;
+        }
+
+        m_rgLinePoints[0] = startPoint;
+    }
+
+    STDMETHOD_(void, AddLines)(const D2D1_POINT_2F* points, unsigned int pointsCount);
+
+    STDMETHOD_(void, AddBeziers)(const D2D1_BEZIER_SEGMENT* beziers, unsigned int beziersCount) {
+        //
+        // If any beziers are added, then we're definitely not a rectangle.
+        //
+        m_fDefinitelyNotRectangle = true;
+    }
+
+    STDMETHOD(Close)();
+
+    STDMETHOD_(ULONG, AddRef)() {
+        return 0;
+    }
+
+    STDMETHOD_(ULONG, Release)() {
+        return 0;
+    }
+
+    //
+    // IUnknown methods
+    //
+    STDMETHOD(QueryInterface)(REFIID riid, void** ppv) {
+        return E_NOTIMPL;
+    }
+
+private:
+    bool m_fPathOpened;
+    bool m_fFigureOpened;
+
+    unsigned int m_uFigureNum;
+
+    unsigned int m_cLines;
+
+    //
+    // We keep 5 points to make it easier to store for 4 connected lines.  At
+    // the end we will verify the last point is equal to the first.
+    //
+    D2D1_POINT_2F m_rgLinePoints[5];
+
+    bool m_fDefinitelyNotRectangle;
+    bool m_fConfirmedRectangle;
+};

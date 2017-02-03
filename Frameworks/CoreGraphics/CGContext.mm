@@ -52,6 +52,29 @@
 
 using namespace Microsoft::WRL;
 
+static HRESULT __CGD2DDetectAxisAlignedRect(ID2D1Geometry* geometry, bool* pIsAxisAlignedRect) {
+    RETURN_HR_IF(E_POINTER, !pIsAxisAlignedRect);
+    *pIsAxisAlignedRect = false;
+
+    unsigned int figures = 0;
+    unsigned int segments = 0;
+
+    ComPtr<ID2D1PathGeometry> pathGeometry;
+    geometry->QueryInterface(IID_PPV_ARGS(&pathGeometry));
+    if (pathGeometry) {
+        RETURN_IF_FAILED(pathGeometry->GetFigureCount(&figures));
+        RETURN_IF_FAILED(pathGeometry->GetSegmentCount(&segments));
+    }
+
+    if (!pathGeometry || (figures == 1 && segments > 2 && segments < 6)) {
+        AxisAlignedRectangleChecker rectChecker;
+        RETURN_IF_FAILED(geometry->Simplify( D2D1_GEOMETRY_SIMPLIFICATION_OPTION_CUBICS_AND_LINES, D2D1::IdentityMatrix(), 0.0f, &rectChecker ));
+        *pIsAxisAlignedRect = rectChecker.IsAxisAlignedRectangle();
+    }
+
+    return S_OK;
+}
+
 static const wchar_t* TAG = L"CGContext";
 
 // Coordinate offset to support CGGradientDrawingOptions
@@ -114,6 +137,7 @@ struct __CGContextDrawingState {
 
     // Clipping + Masking
     ComPtr<ID2D1Geometry> clippingGeometry;
+    bool clippingGeometryIsAxisAlignedRect{false};
     ComPtr<ID2D1BitmapBrush> opacityBrush;
 
     // Text Drawing
@@ -156,7 +180,8 @@ struct __CGContextDrawingState {
 
         if (!clippingGeometry) {
             // If we don't have a clipping geometry, we are free to take this one wholesale (after EO/Winding conversion.)
-            return _CGConvertD2DGeometryToFillMode(incomingGeometry, d2dFillMode, &clippingGeometry);
+            RETURN_IF_FAILED(_CGConvertD2DGeometryToFillMode(incomingGeometry, d2dFillMode, &clippingGeometry));
+            return __CGD2DDetectAxisAlignedRect(incomingGeometry, &clippingGeometryIsAxisAlignedRect);
         }
 
         ComPtr<ID2D1Factory> factory;
@@ -176,6 +201,7 @@ struct __CGContextDrawingState {
 
         RETURN_IF_FAILED(geometrySink->Close());
 
+        RETURN_IF_FAILED(__CGD2DDetectAxisAlignedRect(newClippingPathGeometry.Get(), &clippingGeometryIsAxisAlignedRect));
         clippingGeometry.Attach(newClippingPathGeometry.Detach());
         return S_OK;
     }

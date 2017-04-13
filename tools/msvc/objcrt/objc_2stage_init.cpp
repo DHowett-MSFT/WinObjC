@@ -44,7 +44,6 @@
 #pragma section(".objcrt$ma", read)
 #pragma section(".objcrt$mz", read)
 #pragma section(".CRT$XCLA", read)
-#pragma section(".CRT$XCLB", read)
 #pragma section(".CRT$XCV", read)
 
 // .CRT is already merged to .rdata
@@ -59,25 +58,12 @@ extern "C" __declspec(selectany) _SEGALLOC(".objcrt$mz") const void* __objc_modu
 extern "C" void __objc_load_module(const void*);
 extern "C" void __objc_resolve_module(const void*);
 extern "C" void __objc_resolve_legacy_modules();
+extern "C" void __objc_exec_library(void*, const void*, const void*);
 
+extern "C" void* __ImageBase;
 // Step 1: Load all classes and thaw them from the binary.
 static void ___objc_load_compiled_modules() {
-    for (const void** i = __objc_modules_a + 1; i < __objc_modules_z; ++i) {
-        if (*i) {
-            __objc_load_module(*i);
-        }
-    }
-    return;
-}
-
-// Step 2: Resolve all loaded classes and categories (call +load).
-static void ___objc_resolve_compiled_modules() {
-    for (const void** i = __objc_modules_a + 1; i < __objc_modules_z; ++i) {
-        if (*i) {
-            __objc_resolve_module(*i);
-        }
-    }
-    return;
+    __objc_exec_library((void*)&__ImageBase, __objc_modules_a, __objc_modules_z);
 }
 
 // Step 3: Resolve all classes that were legacy-registered via __objc_exec_class.
@@ -87,7 +73,6 @@ static void ___objc_legacy_resolve_all() {
 
 // Register load and resolve to happen in order during library init (.CRT$XCL).
 extern "C" const InitFunc __declspec(selectany) _SEGALLOC(".CRT$XCLA") ___objc_modern_load = &___objc_load_compiled_modules;
-extern "C" const InitFunc __declspec(selectany) _SEGALLOC(".CRT$XCLB") ___objc_modern_resolve = &___objc_resolve_compiled_modules;
 
 // Register final legacy resolution to happen after user static init (nominally .CRT$XCU).
 // We can't happen before .CRT$XCU here because .objc_load_function is part of .CRT$XCU;
@@ -100,9 +85,9 @@ extern "C" __declspec(selectany) const void* ___pin_objc_init = 0x0;
 
 // Force inclusion of this TU.
 #if defined(_M_IX86)
-#pragma comment(linker, "/include:____objc_modern_load /include:____objc_modern_resolve /include:____objc_legacy_post_XCU")
+#pragma comment(linker, "/include:____objc_modern_load /include:____objc_legacy_post_XCU")
 #elif defined(_M_ARM)
-#pragma comment(linker, "/include:___objc_modern_load /include:___objc_modern_resolve /include:___objc_legacy_post_XCU")
+#pragma comment(linker, "/include:___objc_modern_load /include:___objc_legacy_post_XCU")
 #else
 #error Can't force-include objc_2stage_init initializers.
 #endif

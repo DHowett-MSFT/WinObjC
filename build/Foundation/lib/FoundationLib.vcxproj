@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClangCompile Include="..\..\..\Frameworks\Foundation\_NSAutoContentAccessingProxy.mm" />
     <MASM Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\Foundation\_NSInvocation.x86.asm">
       <ExcludedFromBuild Condition="'$(Platform)'!='Win32'">true</ExcludedFromBuild>
       <UseSafeExceptionHandlers>true</UseSafeExceptionHandlers>

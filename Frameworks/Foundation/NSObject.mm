@@ -41,6 +41,7 @@
 #import "CFFoundationInternal.h"
 #import "NSInvocationInternal.h"
 #import "NSObjectInternal.h"
+#import "_NSAutoContentAccessingProxy.h"
 
 static void _NSObjCEnumerationMutation(id object) {
     [NSException raise:NSInternalInconsistencyException
@@ -668,7 +669,6 @@ static IMP _NSIMPForward(id object, SEL selector) {
 
 /**
  @Status Stub
- @Notes
 */
 + (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget {
     UNIMPLEMENTED();
@@ -676,7 +676,6 @@ static IMP _NSIMPForward(id object, SEL selector) {
 
 /**
  @Status Stub
- @Notes
 */
 + (void)cancelPreviousPerformRequestsWithTarget:(id)aTarget selector:(SEL)aSelector object:(id)anArgument {
     UNIMPLEMENTED();
@@ -684,15 +683,20 @@ static IMP _NSIMPForward(id object, SEL selector) {
 
 /**
  @Status Interoperable
- @Notes
 */
 - (BOOL)isProxy {
     return NO;
 }
 
+/**
+ @Status Interoperable
+*/
 - (id)autoContentAccessingProxy {
-    UNIMPLEMENTED();
-    return StubReturn();
+    if (![self conformsToProtocol:@protocol(NSDiscardableContent)]) {
+        return nil;
+    }
+
+    return [_NSAutoContentAccessingProxy proxyForObject:static_cast<NSObject<NSDiscardableContent>*>(self)];
 }
 
 - (CFTypeID)_cfTypeID {

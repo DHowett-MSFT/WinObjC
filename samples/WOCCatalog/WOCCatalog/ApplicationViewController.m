@@ -16,6 +16,8 @@
 
 #import "ApplicationViewController.h"
 #import "UIKit/UIDevice.h"
+#import "UWP/WindowsSystem.h"
+#include <Windows.h>
 
 static const CGFloat c_originX = 5;
 static const CGFloat c_originY = 8;
@@ -29,6 +31,7 @@ static const CGFloat c_height = 40;
     NSString* identifierForVendor;
     UITextField* currentSystemVersion;
     UIButton* _disableInputButton;
+    NSCache* _cache;
 }
 
 - (void)viewDidLoad {
@@ -38,6 +41,7 @@ static const CGFloat c_height = 40;
 
 - (id)init {
     self = [super init];
+    _cache = [[NSCache alloc] init];
     device = [UIDevice currentDevice];
     name = [device name];
     systemVersion = [device systemVersion];
@@ -164,10 +168,23 @@ static const CGFloat c_height = 40;
     [[UIApplication sharedApplication] endIgnoringInteractionEvents];
 }
 
+#pragma comment (lib, "kernel32.lib")
+
 - (void)_disableInputButtonClicked {
     // Disable input for 5 seconds
-    [[UIApplication sharedApplication] beginIgnoringInteractionEvents];
-    [self performSelector:@selector(_reEnableInput) withObject:self afterDelay:5.0];
+    //[[UIApplication sharedApplication] beginIgnoringInteractionEvents];
+    //[self performSelector:@selector(_reEnableInput) withObject:self afterDelay:5.0];
+    NSString* f = [NSString stringWithFormat:@"Using %lu/%lu bytes, USAGE %d\n", (unsigned long)[WSMemoryManager appMemoryUsage], (unsigned long)[WSMemoryManager appMemoryUsageLimit], (int)[WSMemoryManager appMemoryUsageLevel]];
+    OutputDebugStringA([f UTF8String]);
+    static int s_length = 100*1048576;
+    void* bytes = malloc(s_length);
+    while(bytes == NULL) {
+        s_length >>= 1;
+        bytes = malloc(s_length);
+    }
+    memset(bytes, 0xcd, s_length);
+    NSData* data = [[NSData alloc] initWithBytesNoCopy:bytes length:s_length freeWhenDone:YES];
+    [_cache setObject:data forKey:[NSString stringWithFormat:@"%p", bytes]];
 }
 
 @end

@@ -20,6 +20,13 @@
 
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
+
+#include <COMIncludes.h>
+#include <winrt/Windows.System.h>
+#include <COMIncludes_end.h>
+
+#include <CppWinRTHelpers.h>
 
 @interface _NSCacheEntry : NSObject
 @property (nonatomic, assign) NSUInteger cost;
@@ -84,6 +91,48 @@ using cacheType = std::list<StrongId<_NSCacheEntry>>;
 
 @implementation NSCache
 
+using namespace winrt::Windows::System;
+static std::unordered_set<__unsafe_unretained NSCache*> s_allCaches;
+static std::atomic<AppMemoryUsageLevel> s_memoryUsageLevel;
+
++ (void)_registerCache:(NSCache*)cache {
+    s_allCaches.emplace(cache);
+}
+
++ (void)_unregisterCache:(NSCache*)cache {
+    s_allCaches.erase(cache);
+}
+
++ (void)_voidAllCaches {
+    for(__unsafe_unretained NSCache* cache : s_allCaches) {
+        if (s_memoryUsageLevel != AppMemoryUsageLevel::High) {
+            // We may have cleared enough cached data to trip back below High.
+            break;
+        }
+        [cache removeAllObjects];
+    }
+}
+
++ (void)initialize {
+    s_memoryUsageLevel = MemoryManager::AppMemoryUsageLevel();
+    MemoryManager::AppMemoryUsageIncreased(objcwinrt::callback([](auto&&, auto&& /* we do not care about these arguments */){
+        s_memoryUsageLevel = MemoryManager::AppMemoryUsageLevel();
+        if (s_memoryUsageLevel == AppMemoryUsageLevel::High) {
+            [NSCache _voidAllCaches];
+        }
+    }));
+
+    MemoryManager::AppMemoryUsageDecreased([](auto&&, auto&& /* we do not care about these arguments */){
+        s_memoryUsageLevel = MemoryManager::AppMemoryUsageLevel();
+    });
+}
+
++ (id)allocWithZone:(NSZone*)zone {
+    id newCache = [super allocWithZone:zone];
+    [NSCache _registerCache:newCache];
+    return newCache;
+}
+
 - (instancetype)init {
     if (self = [super init]) {
         _evictsObjectsWithDiscardedContent = YES;
@@ -92,6 +141,8 @@ using cacheType = std::list<StrongId<_NSCacheEntry>>;
 }
 
 - (void)dealloc {
+    [NSCache _unregisterCache:self];
+
     [_name release];
     [super dealloc];
 }

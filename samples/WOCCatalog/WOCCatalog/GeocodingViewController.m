@@ -160,6 +160,9 @@
 }
 
 - (void)viewWillAppear:(BOOL)animated {
+    NSException* exc = [NSException exceptionWithName:@"Blah" reason:@"hello world" userInfo:nil];
+	[exc raise];
+    //[NSThread detachNewThreadSelector:@selector(raise) toTarget:exc withObject:nil];
     [self updateTaskInfo];
     [self startGeocodingCalls];
     [self.tableView reloadData];

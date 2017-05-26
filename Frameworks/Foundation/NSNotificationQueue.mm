@@ -20,6 +20,8 @@
 
 @interface NSNotificationQueue () {
     StrongId<NSNotificationCenter> _notificationCenter;
+    StrongId<NSMutableArray<NSNotification*>> _asapQueue;
+    StrongId<NSMutableArray<NSNotification*>> _idleQueue;
 }
 @end
 
@@ -44,6 +46,8 @@
 - (instancetype)initWithNotificationCenter:(NSNotificationCenter*)notificationCenter {
     if (self = [super init]) {
         _notificationCenter = notificationCenter;
+        _asapQueue.attach([NSMutableArray new]);
+        _idleQueue.attach([NSMutableArray new]);
     }
     return self;
 }
@@ -61,45 +65,95 @@
 
 /**
  @Status Caveat
- @Notes Ignores the coalescing mask.
+ @Notes Ignores the coalescing mask and the runloop modes.
 */
 - (void)enqueueNotification:(NSNotification*)notification
                postingStyle:(NSPostingStyle)postingStyle
                coalesceMask:(NSNotificationCoalescing)coalesceMask
                    forModes:(NSArray*)modes {
+    if (!notification) {
+        [NSException raise:NSInvalidArgumentException format:@"*** %s: notification must not be nil", __PRETTY_FUNCTION__];
+    }
+
     if (!modes) {
         modes = @[ NSDefaultRunLoopMode ];
     }
 
+    if (postingStyle == NSPostNow) {
+        [_notificationCenter postNotification:notification];
+        return;
+    }
+
+    NSMutableArray<NSNotification*>* queue = nil;
+
     switch (postingStyle) {
-        case NSPostNow:
-            [_notificationCenter postNotification:notification];
-            break;
         case NSPostASAP:
-            // NOTE: Posting with order 0 makes this the next thing to execute when the runloop spins again.
-            [[NSRunLoop currentRunLoop] performSelector:@selector(postNotification:)
-                                                 target:_notificationCenter
-                                               argument:notification
-                                                  order:0
-                                                  modes:modes];
+            queue = _asapQueue;
             break;
         case NSPostWhenIdle:
-            // NOTE: Approximating "later" by passing the highest order we can; this should be scheduled after all other performs.
-            [[NSRunLoop currentRunLoop] performSelector:@selector(postNotification:)
-                                                 target:_notificationCenter
-                                               argument:notification
-                                                  order:NSUIntegerMax
-                                                  modes:modes];
+            queue = _idleQueue;
             break;
+        default:
+            [NSException raise:NSInvalidArgumentException format:@"*** %s: unknown posting style %u", __PRETTY_FUNCTION__, (unsigned /* int */)postingStyle];
+            break;
+    }
+
+    @synchronized(queue) {
+        [queue addObject:notification];
     }
 }
 
 /**
  @Status Stub
- @Notes Doesn't unqueue anything because notifications are posted immediately.
+ @Notes Doesn't unqueue anything.
 */
 - (void)dequeueNotificationsMatching:(NSNotification*)notification coalesceMask:(NSUInteger)coalesceMask {
     UNIMPLEMENTED();
+}
+
+- (void)_drainQueue:(NSMutableArray<NSNotification*>*)queue {
+    StrongId<NSArray> queueCopy{ woc::TakeOwnership, [queue copy] };
+    // If the notification triggers another spin of the run loop (it shouldn't),
+    // we don't want to double-fire this set of notifications.
+    [queue removeAllObjects];
+
+    for (NSNotification* notification in queueCopy.get()) {
+        [_notificationCenter postNotification:notification];
+    }
+}
+
+/**
+ @Status Stub
+ @Public No
+ @Notes This method is used by NSRunLoop as part of proper dispatch of queued notifications.
+        It ignores the run loop mode.
+*/
+- (void)asapProcessMode:(NSRunLoopMode)mode {
+    if ([_asapQueue count] > 0) {
+        [self _drainQueue:_asapQueue];
+    }
+}
+
+/**
+ @Status Caveat
+ @Public No
+ @Notes This method is used by NSRunLoop as part of proper dispatch of queued notifications.
+        It ignores the run loop mode.
+*/
+- (BOOL)hasIdleNotificationsInMode:(NSRunLoopMode)mode {
+    return [_idleQueue count] > 0;
+}
+
+/**
+ @Status Stub
+ @Public No
+ @Notes This method is used by NSRunLoop as part of proper dispatch of queued notifications.
+        It ignores the run loop mode.
+*/
+- (void)idleProcessMode:(NSRunLoopMode)mode {
+    if ([_idleQueue count] > 0) {
+        [self _drainQueue:_idleQueue];
+    }
 }
 
 @end

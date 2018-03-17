@@ -1,0 +1,123 @@
+From 7938f946f46878011ce527116a9e857557dc43ca Mon Sep 17 00:00:00 2001
+From: "Dustin L. Howett" <duhowett@microsoft.com>
+Date: Sun, 25 Feb 2018 19:30:07 -0800
+Subject: [PATCH 13/13] Sema: allow comparison between blocks &
+ block-compatible objc types
+
+This commit makes valid the following code:
+
+ // objective-c++
+ #define nil ((id)nullptr)
+ ...
+ void (^f)() = ^{};
+ if (f == nil) {
+ }
+ ...
+
+Where it would previously fail with the error "invalid operands to
+binary expression ('void (^)()' and 'id')".
+
+Comparisons are now allowed between block types and id, id<NSCopying>,
+id<NSObject>, and NSObject*. No other comparisons are changed.
+
+Fixes https://bugs.llvm.org/show_bug.cgi?id=XXXXXX.
+---
+ lib/Sema/SemaExpr.cpp          | 16 +++++++++++--
+ test/SemaObjC/block-compare.mm | 51 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+), 2 deletions(-)
+ create mode 100644 test/SemaObjC/block-compare.mm
+
+diff --git a/lib/Sema/SemaExpr.cpp b/lib/Sema/SemaExpr.cpp
+index 07eb02bec0..df87c769d4 100644
+--- a/lib/Sema/SemaExpr.cpp
++++ b/lib/Sema/SemaExpr.cpp
+@@ -7745,8 +7745,8 @@ Sema::CheckAssignmentConstraints(QualType LHSType, ExprResult &RHS,
+       return IntToBlockPointer;
+     }
+ 
+-    // id -> T^
+-    if (getLangOpts().ObjC1 && RHSType->isObjCIdType()) {
++    // id (or strictly compatible object type) -> T^
++    if (getLangOpts().ObjC1 && RHSType->isBlockCompatibleObjCPointerType(Context)) {
+       Kind = CK_AnyPointerToBlockPointerCast;
+       return Compatible;
+     }
+@@ -10028,6 +10028,18 @@ QualType Sema::CheckCompareOperands(ExprResult &LHS, ExprResult &RHS,
+         RHS = ImpCastExprToType(RHS.get(), LHSType, CK_BitCast);
+       return ResultTy;
+     }
++
++    if(!IsRelational &&
++       LHSType->isBlockPointerType() &&
++       RHSType->isBlockCompatibleObjCPointerType(Context)) {
++      LHS = ImpCastExprToType(LHS.get(), RHSType, CK_BlockPointerToObjCPointerCast);
++      return ResultTy;
++    } else if(!IsRelational &&
++              LHSType->isBlockCompatibleObjCPointerType(Context) &&
++              RHSType->isBlockPointerType()) {
++      RHS = ImpCastExprToType(RHS.get(), LHSType, CK_BlockPointerToObjCPointerCast);
++      return ResultTy;
++    }
+   }
+   if ((LHSType->isAnyPointerType() && RHSType->isIntegerType()) ||
+       (LHSType->isIntegerType() && RHSType->isAnyPointerType())) {
+diff --git a/test/SemaObjC/block-compare.mm b/test/SemaObjC/block-compare.mm
+new file mode 100644
+index 0000000000..c63f484a80
+--- /dev/null
++++ b/test/SemaObjC/block-compare.mm
+@@ -0,0 +1,51 @@
++// RUN: %clang_cc1 -S -o - -triple i686-windows -verify -fblocks \
++// RUN:     -Wno-unused-comparison %s
++
++#pragma clang diagnostic ignored "-Wunused-comparison"
++
++#define nil ((id)nullptr)
++
++@protocol NSObject
++@end
++
++@protocol NSCopying
++@end
++
++@protocol OtherProtocol
++@end
++
++__attribute__((objc_root_class))
++@interface NSObject <NSObject, NSCopying>
++@end
++
++__attribute__((objc_root_class))
++@interface Test
++@end
++
++int main() {
++  void (^block)() = ^{};
++  NSObject *object;
++  id<NSObject, NSCopying> qualifiedId;
++
++  id<OtherProtocol> poorlyQualified1;
++  Test *objectOfWrongType;
++
++  block == nil;
++  block == object;
++  block == qualifiedId;
++
++  nil == block;
++  object == block;
++  qualifiedId == block;
++
++  // these are still not valid: blocks must be compared with id, NSObject*, or a protocol-qualified id
++  // conforming to NSCopying or NSObject.
++
++  block == poorlyQualified1; // expected-error {{invalid operands to binary expression ('void (^)()' and 'id<OtherProtocol>')}}
++  block == objectOfWrongType; // expected-error {{invalid operands to binary expression ('void (^)()' and 'Test *')}}
++
++  poorlyQualified1 == block; // expected-error {{invalid operands to binary expression ('id<OtherProtocol>' and 'void (^)()')}}
++  objectOfWrongType == block; // expected-error {{invalid operands to binary expression ('Test *' and 'void (^)()')}}
++
++  return 0;
++}
+-- 
+2.15.1.gvfs.2.39.g03d366a
+

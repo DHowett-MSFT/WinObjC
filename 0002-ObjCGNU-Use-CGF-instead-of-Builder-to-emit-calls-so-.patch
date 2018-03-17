@@ -1,0 +1,26 @@
+From 7a75a49405e97a65ecb71d4a008475b3de2df66f Mon Sep 17 00:00:00 2001
+From: "Dustin L. Howett" <duhowett@microsoft.com>
+Date: Sun, 21 Jan 2018 23:31:52 -0800
+Subject: [PATCH 02/13] [ObjCGNU] Use CGF instead of Builder to emit calls so
+ they're funclet annotated
+
+---
+ lib/CodeGen/CGObjCRuntime.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/CodeGen/CGObjCRuntime.cpp b/lib/CodeGen/CGObjCRuntime.cpp
+index 581d50e5d6..b198256fa1 100644
+--- a/lib/CodeGen/CGObjCRuntime.cpp
++++ b/lib/CodeGen/CGObjCRuntime.cpp
+@@ -322,7 +322,7 @@ namespace {
+       : SyncExitFn(SyncExitFn), SyncArg(SyncArg) {}
+ 
+     void Emit(CodeGenFunction &CGF, Flags flags) override {
+-      CGF.Builder.CreateCall(SyncExitFn, SyncArg)->setDoesNotThrow();
++      CGF.EmitNounwindRuntimeCall(SyncExitFn, SyncArg);
+     }
+   };
+ }
+-- 
+2.15.1.gvfs.2.39.g03d366a
+

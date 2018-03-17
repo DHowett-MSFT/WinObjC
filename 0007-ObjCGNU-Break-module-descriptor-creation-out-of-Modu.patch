@@ -1,0 +1,68 @@
+From b5b704199d9d000c48a1efa40cec6cc6166b2b90 Mon Sep 17 00:00:00 2001
+From: "Dustin L. Howett" <duhowett@microsoft.com>
+Date: Sun, 21 Jan 2018 23:39:31 -0800
+Subject: [PATCH 07/13] [ObjCGNU] Break module descriptor creation out of
+ ModuleInitFunction
+
+---
+ lib/CodeGen/CGObjCGNU.cpp | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/lib/CodeGen/CGObjCGNU.cpp b/lib/CodeGen/CGObjCGNU.cpp
+index 4d15e2ed6f..fe560a2839 100644
+--- a/lib/CodeGen/CGObjCGNU.cpp
++++ b/lib/CodeGen/CGObjCGNU.cpp
+@@ -463,6 +463,10 @@ protected:
+   /// while a bitfield / with the 63rd bit set will be 1<<64.
+   llvm::Constant *MakeBitField(ArrayRef<bool> bits);
+ 
++  /// Creates the module descriptor in global storage; this is a point of
++  /// override for runtimes based on GNU.
++  virtual llvm::GlobalVariable *MakeModuleDescriptor();
++
+ public:
+   CGObjCGNU(CodeGenModule &cgm, unsigned runtimeABIVersion,
+       unsigned protocolClassVersion);
+@@ -2373,7 +2377,7 @@ void CGObjCGNU::GenerateClass(const ObjCImplementationDecl *OID) {
+   Classes.push_back(ClassStruct);
+ }
+ 
+-llvm::Function *CGObjCGNU::ModuleInitFunction() {
++llvm::GlobalVariable *CGObjCGNU::MakeModuleDescriptor() {
+   // Only emit an ObjC load function if no Objective-C stuff has been called
+   if (Classes.empty() && Categories.empty() && ConstantStrings.empty() &&
+       ExistingProtocols.empty() && SelectorTable.empty())
+@@ -2514,7 +2518,7 @@ llvm::Function *CGObjCGNU::ModuleInitFunction() {
+ 
+   // The symbol table is contained in a module which has some version-checking
+   // constants
+-  llvm::Constant *module = [&] {
++  llvm::GlobalVariable *module = [&] {
+     llvm::Type *moduleEltTys[] = {
+       LongTy, LongTy, PtrToInt8Ty, symtab->getType(), IntTy
+     };
+@@ -2554,9 +2558,20 @@ llvm::Function *CGObjCGNU::ModuleInitFunction() {
+       }
+     }
+ 
+-    return module.finishAndCreateGlobal("", CGM.getPointerAlign());
++    return module.finishAndCreateGlobal("", CGM.getPointerAlign(),
++                                        /*isConstant=*/true,
++                                        llvm::GlobalValue::PrivateLinkage);
+   }();
+ 
++  return module;
++}
++
++llvm::Function *CGObjCGNU::ModuleInitFunction() {
++  llvm::Constant *module = MakeModuleDescriptor();
++  if (module == nullptr) {
++    return nullptr;
++  }
++
+   // Create the load function calling the runtime entry point with the module
+   // structure
+   llvm::Function * LoadFunction = llvm::Function::Create(
+-- 
+2.15.1.gvfs.2.39.g03d366a
+

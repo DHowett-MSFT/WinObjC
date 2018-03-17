@@ -1,0 +1,31 @@
+From 5b3508df0a2283471cc957e19dc1ed034ff81300 Mon Sep 17 00:00:00 2001
+From: "Dustin L. Howett" <duhowett@microsoft.com>
+Date: Sun, 21 Jan 2018 23:28:53 -0800
+Subject: [PATCH 08/13] SPECULATIVE: Catchall in microsoft personality?
+
+---
+ lib/CodeGen/CGException.cpp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/lib/CodeGen/CGException.cpp b/lib/CodeGen/CGException.cpp
+index 6b55ce14f8..0e1db69832 100644
+--- a/lib/CodeGen/CGException.cpp
++++ b/lib/CodeGen/CGException.cpp
+@@ -819,11 +819,11 @@ llvm::BasicBlock *CodeGenFunction::EmitLandingPad() {
+     EHCatchScope &catchScope = cast<EHCatchScope>(*I);
+     for (unsigned hi = 0, he = catchScope.getNumHandlers(); hi != he; ++hi) {
+       EHCatchScope::Handler handler = catchScope.getHandler(hi);
+-      assert(handler.Type.Flags == 0 &&
+-             "landingpads do not support catch handler flags");
++      //assert((handler.Type.Flags == 0 || handler.Type.Flags == 0x40) &&
++             //"landingpads do not support catch handler flags");
+ 
+       // If this is a catch-all, register that and abort.
+-      if (!handler.Type.RTTI) {
++      if (!handler.Type.RTTI || handler.Type.Flags == 0x40 /* MSVC flags for catch-all */) {
+         assert(!hasCatchAll);
+         hasCatchAll = true;
+         goto done;
+-- 
+2.15.1.gvfs.2.39.g03d366a
+

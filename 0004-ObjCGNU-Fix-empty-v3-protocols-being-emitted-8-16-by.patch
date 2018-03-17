@@ -1,0 +1,26 @@
+From 7501117ef06efa88d0a1a8ad35a110eff0803952 Mon Sep 17 00:00:00 2001
+From: "Dustin L. Howett" <duhowett@microsoft.com>
+Date: Sun, 21 Jan 2018 23:37:30 -0800
+Subject: [PATCH 04/13] ObjCGNU: Fix empty v3 protocols being emitted 8-16
+ bytes short
+
+---
+ lib/CodeGen/CGObjCGNU.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib/CodeGen/CGObjCGNU.cpp b/lib/CodeGen/CGObjCGNU.cpp
+index a6b6c38d5c..0a79ae3a2e 100644
+--- a/lib/CodeGen/CGObjCGNU.cpp
++++ b/lib/CodeGen/CGObjCGNU.cpp
+@@ -1753,6 +1753,8 @@ CGObjCGNU::GenerateEmptyProtocol(const std::string &ProtocolName) {
+   Elements.add(MethodList);
+   Elements.add(MethodList);
+   Elements.add(MethodList);
++  Elements.add(MethodList);
++  Elements.add(MethodList);
+   return Elements.finishAndCreateGlobal(".objc_protocol",
+                                         CGM.getPointerAlign());
+ }
+-- 
+2.15.1.gvfs.2.39.g03d366a
+
